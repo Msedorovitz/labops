@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LabOps — New Sight Therapeutics</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --surface: #ffffff; --surface2: #f2f2ef; --border: #e8e8e4; --border2: #d8d8d2;
+    --text: #1a1a18; --text2: #6b6b64; --text3: #9b9b92;
+    --accent: #2563eb; --accent-bg: #eff4ff;
+    --green: #16a34a; --green-bg: #f0fdf4;
+    --red: #dc2626; --red-bg: #fef2f2;
+    --amber: #d97706; --amber-bg: #fffbeb;
+    --purple: #7c3aed; --purple-bg: #f5f3ff;
+    --radius: 10px; --radius-lg: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
+    --sidebar: 220px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; display: flex; min-height: 100vh; }
+
+  /* AUTH SCREEN */
+  .auth-screen { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 20px; }
+  .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px 48px; text-align: center; max-width: 380px; box-shadow: var(--shadow-md); }
+  .auth-logo { width: 48px; height: 48px; background: var(--text); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
+  .auth-logo svg { width: 24px; height: 24px; fill: white; }
+  .auth-title { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .auth-sub { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+  .auth-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 11px 20px; background: #0078d4; color: white; border: none; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500; font-family: inherit; transition: background 0.12s; }
+  .auth-btn:hover { background: #006cbe; }
+  .auth-btn svg { width: 18px; height: 18px; }
+  .auth-error { font-size: 12px; color: var(--red); margin-top: 12px; display: none; }
+
+  /* LOADING */
+  .loading-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--accent); z-index: 9998; transform: scaleX(0); transform-origin: left; transition: transform 0.3s ease; }
+  .loading-bar.active { transform: scaleX(0.7); }
+  .loading-bar.done { transform: scaleX(1); transition: transform 0.15s ease, opacity 0.3s 0.2s; opacity: 0; }
+
+  /* TOAST */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 9000; display: flex; flex-direction: column; gap: 8px; }
+  .toast { background: var(--text); color: white; padding: 11px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 500; box-shadow: var(--shadow-md); animation: slideIn 0.2s ease; max-width: 300px; }
+  .toast.error { background: var(--red); }
+  .toast.success { background: var(--green); }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* SIDEBAR */
+  .sidebar { width: var(--sidebar); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100vh; z-index: 100; }
+  .sidebar-logo { padding: 20px 18px 16px; border-bottom: 1px solid var(--border); }
+  .sidebar-logo .logo-mark { display: flex; align-items: center; gap: 9px; }
+  .sidebar-logo .logo-icon { width: 28px; height: 28px; background: var(--text); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+  .sidebar-logo .logo-icon svg { width: 15px; height: 15px; fill: white; }
+  .sidebar-logo .logo-text { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .sidebar-logo .logo-sub { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+  .nav-section { margin-bottom: 6px; }
+  .nav-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text3); padding: 8px 8px 4px; }
+  .nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; cursor: pointer; color: var(--text2); font-size: 13.5px; font-weight: 450; transition: all 0.12s; margin-bottom: 1px; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--text); color: white; font-weight: 500; }
+  .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: 0.7; }
+  .nav-item.active svg { opacity: 1; }
+  .sidebar-footer { padding: 14px; border-top: 1px solid var(--border); }
+  .user-chip { display: flex; align-items: center; gap: 9px; }
+  .user-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-bg); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-role { font-size: 11px; color: var(--text3); }
+  .sign-out-btn { font-size: 11px; color: var(--text3); cursor: pointer; background: none; border: none; font-family: inherit; padding: 2px 0; }
+  .sign-out-btn:hover { color: var(--red); }
+
+  /* MAIN */
+  .main { margin-left: var(--sidebar); flex: 1; min-height: 100vh; display: flex; flex-direction: column; }
+  .page { display: none; padding: 28px 32px; max-width: 1200px; }
+  .page.active { display: block; }
+  .page-header { margin-bottom: 24px; }
+  .page-title { font-size: 20px; font-weight: 600; letter-spacing: -0.4px; }
+  .page-sub { font-size: 13px; color: var(--text2); margin-top: 3px; }
+
+  /* CARDS */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; box-shadow: var(--shadow); }
+  .card-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text3); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+  .card-title a { font-size: 11px; color: var(--accent); text-decoration: none; text-transform: none; letter-spacing: 0; cursor: pointer; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; }
+
+  /* STAT CARDS */
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; }
+  .stat-label { font-size: 12px; color: var(--text3); font-weight: 500; margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 600; letter-spacing: -1px; line-height: 1; }
+  .stat-sub { font-size: 12px; color: var(--text2); margin-top: 5px; }
+
+  /* QUICK ACTIONS */
+  .quick-actions { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .qa-btn { display: flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text); transition: all 0.12s; font-family: inherit; box-shadow: var(--shadow); }
+  .qa-btn:hover { border-color: var(--border2); background: var(--surface2); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .qa-btn.primary { background: var(--text); color: white; border-color: var(--text); }
+  .qa-btn.primary:hover { background: #2a2a28; }
+
+  /* TABLES */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text3); padding: 9px 12px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--bg); }
+  .mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+  .badge-green { background: var(--green-bg); color: var(--green); }
+  .badge-red { background: var(--red-bg); color: var(--red); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber); }
+  .badge-blue { background: var(--accent-bg); color: var(--accent); }
+  .badge-purple { background: var(--purple-bg); color: var(--purple); }
+  .badge-gray { background: var(--surface2); color: var(--text2); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+  .cap-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
+
+  /* FORMS */
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 5px; }
+  .form-input, .form-select, .form-textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font-family: inherit; font-size: 13px; color: var(--text); outline: none; transition: border-color 0.12s; }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
+  .form-textarea { resize: vertical; min-height: 70px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 1000; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border-radius: var(--radius-lg); padding: 24px; width: 100%; max-width: 520px; box-shadow: var(--shadow-md); max-height: 90vh; overflow-y: auto; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .modal-title { font-size: 16px; font-weight: 600; }
+  .modal-close { width: 28px; height: 28px; border: none; background: var(--surface2); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 16px; }
+  .modal-close:hover { background: var(--border); }
+  .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+  /* BUTTONS */
+  .btn { padding: 9px 18px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 500; font-family: inherit; color: var(--text); transition: all 0.12s; }
+  .btn:hover { background: var(--surface2); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--text); color: white; border-color: var(--text); }
+  .btn-primary:hover:not(:disabled) { background: #2a2a28; }
+  .btn-danger { background: var(--red); color: white; border-color: var(--red); }
+
+  /* FILTERS */
+  .filters-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .filter-select { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font-family: inherit; font-size: 13px; color: var(--text); outline: none; cursor: pointer; }
+  .search-input { padding: 7px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); font-family: inherit; font-size: 13px; color: var(--text); outline: none; flex: 1; min-width: 160px; }
+  .search-input:focus, .filter-select:focus { border-color: var(--accent); }
+
+  /* EMPTY / LOADING */
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text3); font-size: 13px; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* INCIDENT CARDS */
+  .incident-card { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 12px; background: var(--surface); }
+  .incident-card.open { border-left: 3px solid var(--red); }
+  .incident-card.resolved { border-left: 3px solid var(--green); }
+  .incident-card.investigating { border-left: 3px solid var(--amber); }
+  .incident-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .incident-id { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+  .incident-title { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .incident-meta { display: flex; gap: 16px; font-size: 12px; color: var(--text2); margin-top: 8px; flex-wrap: wrap; }
+
+  /* FEED */
+  .feed-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--surface2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .feed-content { flex: 1; }
+  .feed-title { font-size: 13px; font-weight: 500; }
+  .feed-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .feed-time { font-size: 11px; color: var(--text3); white-space: nowrap; }
+
+  /* SEARCH */
+  .search-big { width: 100%; padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); font-family: inherit; font-size: 15px; color: var(--text); outline: none; margin-bottom: 20px; box-shadow: var(--shadow); }
+  .search-big:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
+  .search-result-group { margin-bottom: 20px; }
+  .search-result-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text3); margin-bottom: 8px; }
+  .search-result-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; cursor: pointer; }
+  .search-result-item:hover { border-color: var(--border2); background: var(--surface2); }
+  .search-result-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--surface2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .search-result-main { flex: 1; }
+  .search-result-title { font-size: 13px; font-weight: 500; }
+  .search-result-sub { font-size: 12px; color: var(--text2); }
+
+  /* SYNC INDICATOR */
+  .sync-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text3); padding: 4px 8px; }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+  .sync-dot.syncing { background: var(--amber); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .main { margin-left: 0; }
+    .page { padding: 20px 16px; }
+    .grid-4 { grid-template-columns: 1fr 1fr; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen" id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm0 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 9.5c-2.5 0-4.71-1.28-6-3.22.03-2 4-3.1 6-3.1s5.96 1.1 6 3.1A7.07 7.07 0 0110 14.5z"/></svg>
+    </div>
+    <div class="auth-title">LabOps</div>
+    <div class="auth-sub">New Sight Therapeutics internal lab management. Sign in with your Microsoft account to continue.</div>
+    <button class="auth-btn" id="sign-in-btn" onclick="signIn()">
+      <svg viewBox="0 0 21 21" fill="currentColor"><path d="M10 0H0v10h10V0z" fill="#f25022"/><path d="M21 0H11v10h10V0z" fill="#7fba00"/><path d="M10 11H0v10h10V11z" fill="#00a4ef"/><path d="M21 11H11v10h10V11z" fill="#ffb900"/></svg>
+      Sign in with Microsoft
+    </button>
+    <div class="auth-error" id="auth-error"></div>
+  </div>
+</div>
+
+<!-- LOADING BAR -->
+<div class="loading-bar" id="loading-bar"></div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" id="app-sidebar" style="display:none;">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <div class="logo-icon"><svg viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm0 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm0 9.5c-2.5 0-4.71-1.28-6-3.22.03-2 4-3.1 6-3.1s5.96 1.1 6 3.1A7.07 7.07 0 0110 14.5z"/></svg></div>
+      <div><div class="logo-text">LabOps</div><div class="logo-sub">New Sight Therapeutics</div></div>
+    </div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section">
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 4a2 2 0 012-2h12a2 2 0 012 2v3a2 2 0 01-2 2H4a2 2 0 01-2-2V4zm0 9a2 2 0 012-2h4a2 2 0 012 2v3a2 2 0 01-2 2H4a2 2 0 01-2-2v-3zm10 0a2 2 0 012-2h2a2 2 0 012 2v3a2 2 0 01-2 2h-2a2 2 0 01-2-2v-3z"/></svg>
+        Dashboard
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Logs</div>
+      <div class="nav-item" onclick="navigate('reagents')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zm-2 4a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/></svg>
+        Reagent Lot Log
+      </div>
+      <div class="nav-item" onclick="navigate('thaw')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/></svg>
+        Cell Thaw Log
+      </div>
+      <div class="nav-item" onclick="navigate('bsc')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
+        BSC Usage Log
+      </div>
+      <div class="nav-item" onclick="navigate('contamination')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/></svg>
+        Contamination Log
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Tools</div>
+      <div class="nav-item" onclick="navigate('search')">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/></svg>
+        Search / History
+      </div>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="user-chip">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <div class="user-info">
+        <div class="user-name" id="user-name-display">...</div>
+        <button class="sign-out-btn" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
+    <div class="sync-indicator" id="sync-indicator" style="margin-top:8px;">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-text">Connected</span>
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main" id="app-main" style="display:none;">
+
+<!-- DASHBOARD -->
+<div class="page active" id="page-dashboard">
+  <div class="page-header">
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub" id="dash-date"></div>
+  </div>
+  <div class="quick-actions">
+    <button class="qa-btn primary" onclick="openModal('modal-bsc')">+ Log BSC Use</button>
+    <button class="qa-btn" onclick="openModal('modal-thaw')">+ Log Cell Thaw</button>
+    <button class="qa-btn" onclick="openModal('modal-reagent')">+ Log Reagent Lot</button>
+    <button class="qa-btn" onclick="openModal('modal-contamination')">⚠ Report Contamination</button>
+    <button class="qa-btn" onclick="refreshAll()" style="margin-left:auto;">↻ Refresh</button>
+  </div>
+  <div class="grid-4" style="margin-bottom:20px;">
+    <div class="stat-card"><div class="stat-label">Active Thaws</div><div class="stat-value" id="stat-active-thaws">—</div><div class="stat-sub">in culture</div></div>
+    <div class="stat-card"><div class="stat-label">BSC Events Today</div><div class="stat-value" id="stat-bsc-today">—</div><div class="stat-sub">logged today</div></div>
+    <div class="stat-card"><div class="stat-label">Active Reagent Lots</div><div class="stat-value" id="stat-reagents">—</div><div class="stat-sub">in use</div></div>
+    <div class="stat-card"><div class="stat-label">Open Incidents</div><div class="stat-value" id="stat-incidents" style="color:var(--red)">—</div><div class="stat-sub">open/investigating</div></div>
+  </div>
+  <div class="grid-2" style="margin-bottom:20px;">
+    <div class="card">
+      <div class="card-title">Active Cell Thaws <a onclick="navigate('thaw')">View all →</a></div>
+      <div class="table-wrap"><table><thead><tr><th>Cell Line</th><th>Date</th><th>Passage</th><th>Incubator</th><th>Status</th></tr></thead>
+      <tbody id="dash-thaw-body"><tr><td colspan="5" class="empty-state">Loading...</td></tr></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Recent BSC Activity <a onclick="navigate('bsc')">View all →</a></div>
+      <div id="dash-bsc-feed"><div class="empty-state">Loading...</div></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Current Reagent Lots <a onclick="navigate('reagents')">View all →</a></div>
+      <div class="table-wrap"><table><thead><tr><th>Reagent</th><th>Lot #</th><th>Date</th></tr></thead>
+      <tbody id="dash-reagent-body"><tr><td colspan="3" class="empty-state">Loading...</td></tr></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Recent Contamination Events <a onclick="navigate('contamination')">View all →</a></div>
+      <div class="table-wrap"><table><thead><tr><th>Cell Line</th><th>Date</th><th>Type</th><th>Status</th></tr></thead>
+      <tbody id="dash-cont-body"><tr><td colspan="4" class="empty-state">Loading...</td></tr></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- REAGENT LOG -->
+<div class="page" id="page-reagents">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <div><div class="page-title">Reagent Lot Log</div><div class="page-sub">Track lot numbers and expiration dates</div></div>
+    <button class="btn btn-primary" onclick="openModal('modal-reagent')">+ Add Reagent</button>
+  </div>
+  <div class="filters-bar">
+    <input type="text" class="search-input" placeholder="Search reagent, lot, vendor..." id="reagent-search" oninput="renderReagents()" />
+    <select class="filter-select" id="reagent-filter-inuse" onchange="renderReagents()"><option value="">All status</option><option value="Yes">In use</option><option value="No">Not in use</option></select>
+  </div>
+  <div class="card" style="padding:0;">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Reagent</th><th>Vendor</th><th>Lot #</th><th>Date Recorded</th><th>Opened</th><th>Expires</th><th>Recorded By</th><th>In Use</th><th>Notes</th></tr></thead>
+      <tbody id="reagent-tbody"><tr><td colspan="9" class="empty-state">Loading...</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- THAW LOG -->
+<div class="page" id="page-thaw">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <div><div class="page-title">Cell Thaw Log</div><div class="page-sub">Complete history of all thaw events</div></div>
+    <button class="btn btn-primary" onclick="openModal('modal-thaw')">+ Log Thaw</button>
+  </div>
+  <div class="filters-bar">
+    <input type="text" class="search-input" placeholder="Search cell line..." id="thaw-search" oninput="renderThaw()" />
+    <select class="filter-select" id="thaw-filter-status" onchange="renderThaw()"><option value="">All status</option><option>Active</option><option>Discarded</option><option>Contaminated</option></select>
+    <select class="filter-select" id="thaw-filter-incubator" onchange="renderThaw()"><option value="">All incubators</option><option>Loon</option><option>Caspian</option><option>Snowy</option><option>King</option><option>Merlin</option><option>Kuhner</option></select>
+  </div>
+  <div class="card" style="padding:0;">
+    <div class="table-wrap"><table>
+      <thead><tr><th>Cell Line</th><th>Type</th><th>Date Thawed</th><th>Passage</th><th>Cap</th><th>Thawed By</th><th>Incubator</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody id="thaw-tbody"><tr><td colspan="9" class="empty-state">Loading...</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- BSC LOG -->
+<div class="page" id="page-bsc">
+  <div class="page-header"><div class="page-title">BSC Usage Log</div><div class="page-sub">Log hood usage — optimized for speed</div></div>
+  <div class="grid-2" style="align-items:start;">
+    <div class="card">
+      <div class="card-title">Quick Log Entry</div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">User *</label><input type="text" class="form-input" id="bsc-user" placeholder="Your name" /></div>
+        <div class="form-group"><label class="form-label">BSC *</label>
+          <select class="form-select" id="bsc-hood"><option value="">Select BSC</option><option>BSC-1</option><option>BSC-2</option><option>BSC-3</option><option>BSC-4</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Procedure *</label>
+          <select class="form-select" id="bsc-procedure"><option value="">Select</option><option>Thaw</option><option>Passage</option><option>Media Change</option><option>Transfection</option><option>Harvest</option><option>Infection</option><option>Other</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Cell Line</label><input type="text" class="form-input" id="bsc-cellline" placeholder="e.g. HEK293" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Cell Type</label><input type="text" class="form-input" id="bsc-celltype" /></div>
+        <div class="form-group"><label class="form-label">Timestamp</label><input type="datetime-local" class="form-input" id="bsc-timestamp" /></div>
+      </div>
+      <div class="form-group"><label class="form-label">Notes</label><input type="text" class="form-input" id="bsc-notes" placeholder="Optional" /></div>
+      <button class="btn btn-primary" style="width:100%;padding:11px;" id="bsc-submit-btn" onclick="submitBSC()">Log Event</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Recent Activity <a onclick="navigate('bsc')">↻ Refresh</a></div>
+      <div id="bsc-feed"><div class="empty-state">Loading...</div></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px;padding:0;">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:13px;font-weight:500;">All BSC Events</div>
+      <input type="text" class="search-input" style="max-width:220px;margin:0;" placeholder="Search..." id="bsc-search" oninput="renderBSCTable()" />
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>BSC</th><th>User</th><th>Timestamp</th><th>Cell Line</th><th>Procedure</th><th>Notes</th></tr></thead>
+      <tbody id="bsc-tbody"><tr><td colspan="6" class="empty-state">Loading...</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- CONTAMINATION LOG -->
+<div class="page" id="page-contamination">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <div><div class="page-title">Contamination Incident Log</div><div class="page-sub">Track, investigate, and resolve contamination events</div></div>
+    <button class="btn btn-danger" onclick="openModal('modal-contamination')">+ Report Incident</button>
+  </div>
+  <div class="filters-bar">
+    <select class="filter-select" id="cont-filter-status" onchange="renderContamination()"><option value="">All status</option><option>Open</option><option>Investigating</option><option>Resolved</option><option>Closed</option></select>
+    <select class="filter-select" id="cont-filter-type" onchange="renderContamination()"><option value="">All types</option><option>Bacterial</option><option>Fungal</option><option>Mycoplasma</option><option>Unknown</option></select>
+    <input type="text" class="search-input" placeholder="Search cell line, incubator..." id="cont-search" oninput="renderContamination()" />
+  </div>
+  <div id="contamination-list"></div>
+</div>
+
+<!-- SEARCH -->
+<div class="page" id="page-search">
+  <div class="page-header"><div class="page-title">Search / History</div><div class="page-sub">Search across all logs</div></div>
+  <input type="text" class="search-big" placeholder="Search everything... e.g. HEK293, BSC-1, Loon, lot 240521" id="global-search" oninput="globalSearch(this.value)" />
+  <div id="search-results"><div class="empty-state" style="padding:60px 0;">Start typing to search across all logs</div></div>
+</div>
+
+</div><!-- end .main -->
+
+<!-- MODALS -->
+<!-- BSC Modal -->
+<div class="modal-overlay" id="modal-bsc">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Log BSC Use</div><button class="modal-close" onclick="closeModal('modal-bsc')">×</button></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">User *</label><input type="text" class="form-input" id="m-bsc-user" placeholder="Your name" /></div>
+      <div class="form-group"><label class="form-label">BSC *</label>
+        <select class="form-select" id="m-bsc-hood"><option value="">Select</option><option>BSC-1</option><option>BSC-2</option><option>BSC-3</option><option>BSC-4</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Procedure *</label>
+        <select class="form-select" id="m-bsc-procedure"><option value="">Select</option><option>Thaw</option><option>Passage</option><option>Media Change</option><option>Transfection</option><option>Harvest</option><option>Infection</option><option>Other</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Cell Line</label><input type="text" class="form-input" id="m-bsc-cellline" placeholder="e.g. HEK293" /></div>
+    </div>
+    <div class="form-group"><label class="form-label">Cell Type</label><input type="text" class="form-input" id="m-bsc-celltype" /></div>
+    <div class="form-group"><label class="form-label">Notes</label><input type="text" class="form-input" id="m-bsc-notes" placeholder="Optional" /></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-bsc')">Cancel</button><button class="btn btn-primary" id="m-bsc-submit" onclick="submitBSCModal()">Log Event</button></div>
+  </div>
+</div>
+
+<!-- Thaw Modal -->
+<div class="modal-overlay" id="modal-thaw">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Log Cell Thaw</div><button class="modal-close" onclick="closeModal('modal-thaw')">×</button></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Cell Line *</label><input type="text" class="form-input" id="m-thaw-line" placeholder="e.g. HEK293" /></div>
+      <div class="form-group"><label class="form-label">Cell Type</label><input type="text" class="form-input" id="m-thaw-type" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Date Thawed *</label><input type="date" class="form-input" id="m-thaw-date" /></div>
+      <div class="form-group"><label class="form-label">Passage at Thaw</label><input type="number" class="form-input" id="m-thaw-passage" placeholder="e.g. 5" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Thawed By</label><input type="text" class="form-input" id="m-thaw-by" placeholder="Name" /></div>
+      <div class="form-group"><label class="form-label">Incubator</label>
+        <select class="form-select" id="m-thaw-incubator"><option value="">Select</option><option>Loon</option><option>Caspian</option><option>Snowy</option><option>King</option><option>Merlin</option><option>Kuhner</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Cap Color</label>
+        <select class="form-select" id="m-thaw-cap"><option value="">None</option><option>White</option><option>Orange</option><option>Red</option><option>Pink</option><option>Purple</option><option>Brown</option><option>Grey</option><option>Yellow</option><option>Blue</option><option>Green</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Vial ID</label><input type="text" class="form-input" id="m-thaw-vial" placeholder="Optional" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Date Originally Frozen</label><input type="date" class="form-input" id="m-thaw-frozen-date" /></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="m-thaw-status"><option>Active</option><option>Discarded</option><option>Contaminated</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Notes</label><input type="text" class="form-input" id="m-thaw-notes" placeholder="Optional" /></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-thaw')">Cancel</button><button class="btn btn-primary" id="m-thaw-submit" onclick="submitThaw()">Save Thaw</button></div>
+  </div>
+</div>
+
+<!-- Reagent Modal -->
+<div class="modal-overlay" id="modal-reagent">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Log Reagent Lot</div><button class="modal-close" onclick="closeModal('modal-reagent')">×</button></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Reagent Name *</label><input type="text" class="form-input" id="m-r-name" placeholder="e.g. FectoVIR" /></div>
+      <div class="form-group"><label class="form-label">Lot Number *</label><input type="text" class="form-input" id="m-r-lot" placeholder="e.g. LOT240521" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Vendor</label><input type="text" class="form-input" id="m-r-vendor" /></div>
+      <div class="form-group"><label class="form-label">Recorded By</label><input type="text" class="form-input" id="m-r-by" placeholder="Name" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Date Recorded *</label><input type="date" class="form-input" id="m-r-date" /></div>
+      <div class="form-group"><label class="form-label">In Use?</label>
+        <select class="form-select" id="m-r-inuse"><option value="Yes">Yes</option><option value="No">No</option></select>
+      </div>
+    </div>
+    <details style="margin-bottom:12px;"><summary style="cursor:pointer;font-size:12px;color:var(--text2);padding:6px 0;">Optional fields</summary>
+      <div style="margin-top:10px;">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Opened Date</label><input type="date" class="form-input" id="m-r-opened" /></div>
+          <div class="form-group"><label class="form-label">Expiration Date</label><input type="date" class="form-input" id="m-r-expiry" /></div>
+        </div>
+        <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="m-r-notes"></textarea></div>
+      </div>
+    </details>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-reagent')">Cancel</button><button class="btn btn-primary" id="m-r-submit" onclick="submitReagent()">Save Reagent</button></div>
+  </div>
+</div>
+
+<!-- Contamination Modal -->
+<div class="modal-overlay" id="modal-contamination">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">Report Contamination Incident</div><button class="modal-close" onclick="closeModal('modal-contamination')">×</button></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Cell Line *</label><input type="text" class="form-input" id="m-c-line" /></div>
+      <div class="form-group"><label class="form-label">Cell Type</label><input type="text" class="form-input" id="m-c-type" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Date Detected *</label><input type="date" class="form-input" id="m-c-date" /></div>
+      <div class="form-group"><label class="form-label">Suspected Onset</label><input type="date" class="form-input" id="m-c-onset" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Contamination Type</label>
+        <select class="form-select" id="m-c-conttype"><option>Unknown</option><option>Bacterial</option><option>Fungal</option><option>Mycoplasma</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Incubator</label>
+        <select class="form-select" id="m-c-incubator"><option value="">Select</option><option>Loon</option><option>Caspian</option><option>Snowy</option><option>King</option><option>Merlin</option><option>Kuhner</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Observed By</label><input type="text" class="form-input" id="m-c-by" /></div>
+      <div class="form-group"><label class="form-label">Last BSC Used</label><input type="text" class="form-input" id="m-c-bsc" placeholder="e.g. BSC-2" /></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Linked Thaw ID</label><input type="text" class="form-input" id="m-c-thaw" placeholder="Optional" /></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="m-c-status"><option>Open</option><option>Investigating</option><option>Resolved</option><option>Closed</option></select>
+      </div>
+    </div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="m-c-notes"></textarea></div>
+    <div class="form-group"><label class="form-label">Root Cause</label><input type="text" class="form-input" id="m-c-root" placeholder="Optional" /></div>
+    <div class="form-group"><label class="form-label">Corrective Action</label><input type="text" class="form-input" id="m-c-action" placeholder="Optional" /></div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-contamination')">Cancel</button><button class="btn btn-danger" id="m-c-submit" onclick="submitContamination()">Report Incident</button></div>
+  </div>
+</div>
+
+<script>
+// ===================== CONFIG =====================
+const SITE_URL = 'https://newsighttherapeutics.sharepoint.com';
+const SITE_PATH = '/sites/LabOps'; // UPDATE THIS after you create the SharePoint site
+const LISTS = {
+  reagents: 'LabReagents',
+  thaws: 'LabThaws',
+  bsc: 'LabBSCEvents',
+  contamination: 'LabContamination'
+};
+const MSAL_CONFIG = {
+  auth: {
+    clientId: '7d64dc55-a2ad-4d66-bc6b-0a3377a313f1', // UPDATE after Azure app registration (see setup guide)
+    authority: 'https://login.microsoftonline.com/common',
+    redirectUri: window.location.href.split('?')[0].split('#')[0]
+  },
+  cache: { cacheLocation: 'sessionStorage' }
+};
+const SCOPES = ['https://newsighttherapeutics.sharepoint.com/.default'];
+
+// ===================== MSAL AUTH =====================
+let msalInstance, currentAccount;
+const pca = new msal.PublicClientApplication(MSAL_CONFIG);
+
+async function initAuth() {
+  try {
+    const resp = await pca.handleRedirectPromise();
+    if (resp) { currentAccount = resp.account; showApp(); return; }
+    const accounts = pca.getAllAccounts();
+    if (accounts.length > 0) { currentAccount = accounts[0]; showApp(); }
+  } catch(e) { console.error(e); }
+}
+
+async function signIn() {
+  try {
+    document.getElementById('sign-in-btn').innerHTML = '<span class="spin"></span> Signing in...';
+    await pca.loginRedirect({ scopes: SCOPES });
+  } catch(e) {
+    document.getElementById('auth-error').textContent = 'Sign in failed: ' + e.message;
+    document.getElementById('auth-error').style.display = 'block';
+    document.getElementById('sign-in-btn').textContent = 'Sign in with Microsoft';
+  }
+}
+
+function signOut() {
+  pca.logoutRedirect({ account: currentAccount });
+}
+
+async function getToken() {
+  try {
+    const res = await pca.acquireTokenSilent({ scopes: SCOPES, account: currentAccount });
+    return res.accessToken;
+  } catch(e) {
+    const res = await pca.acquireTokenPopup({ scopes: SCOPES });
+    return res.accessToken;
+  }
+}
+
+function showApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-sidebar').style.display = 'flex';
+  document.getElementById('app-main').style.display = 'block';
+  const name = currentAccount.name || currentAccount.username;
+  const initials = name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-name-display').textContent = name;
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  setBSCTimestamp();
+  refreshAll();
+  setInterval(refreshAll, 60000); // auto-refresh every minute
+}
+
+// ===================== SHAREPOINT API =====================
+async function spGet(list, query='') {
+  setSyncing(true);
+  try {
+    const token = await getToken();
+    const url = `${SITE_URL}${SITE_PATH}/_api/web/lists/getbytitle('${list}')/items?$top=500&$orderby=Created desc${query ? '&' + query : ''}`;
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' fetching ' + list);
+    const data = await res.json();
+    setSyncing(false);
+    return data.value || [];
+  } catch(e) {
+    setSyncing(false);
+    showToast('Failed to load ' + list + ': ' + e.message, 'error');
+    return [];
+  }
+}
+
+async function spPost(list, fields) {
+  setSyncing(true);
+  try {
+    const token = await getToken();
+    const url = `${SITE_URL}${SITE_PATH}/_api/web/lists/getbytitle('${list}')/items`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Accept': 'application/json;odata=nometadata',
+        'Content-Type': 'application/json;odata=nometadata',
+        'X-RequestDigest': await getDigest(token)
+      },
+      body: JSON.stringify(fields)
+    });
+    if (!res.ok) { const t = await res.text(); throw new Error('Save failed: ' + t); }
+    setSyncing(false);
+    return await res.json();
+  } catch(e) {
+    setSyncing(false);
+    showToast('Save failed: ' + e.message, 'error');
+    throw e;
+  }
+}
+
+async function getDigest(token) {
+  const res = await fetch(`${SITE_URL}${SITE_PATH}/_api/contextinfo`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json;odata=nometadata' }
+  });
+  const data = await res.json();
+  return data.FormDigestValue;
+}
+
+// ===================== IN-MEMORY CACHE =====================
+const DB = { reagents: [], thaws: [], bsc: [], contamination: [] };
+
+async function refreshAll() {
+  const [r, t, b, c] = await Promise.all([
+    spGet(LISTS.reagents),
+    spGet(LISTS.thaws),
+    spGet(LISTS.bsc),
+    spGet(LISTS.contamination)
+  ]);
+  DB.reagents = r; DB.thaws = t; DB.bsc = b; DB.contamination = c;
+  const page = document.querySelector('.page.active')?.id?.replace('page-','');
+  updateStats();
+  updateDashboard();
+  if (page === 'reagents') renderReagents();
+  if (page === 'thaw') renderThaw();
+  if (page === 'bsc') { renderBSCFeed(); renderBSCTable(); }
+  if (page === 'contamination') renderContamination();
+}
+
+// ===================== UTILS =====================
+const capColorMap = { White:'#e8e8e8', Orange:'#FB8C00', Red:'#E53935', Pink:'#EC407A', Purple:'#8E24AA', Brown:'#6D4C41', Grey:'#9E9E9E', Yellow:'#FDD835', Blue:'#1E88E5', Green:'#43A047' };
+function fmtDate(d) { if (!d) return '—'; try { const p = d.split('T')[0].split('-'); return `${p[1]}/${p[2]}/${p[0].slice(2)}`; } catch(e) { return d; } }
+function fmtTS(ts) { if (!ts) return '—'; try { return new Date(ts).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true }); } catch(e) { return ts; } }
+function timeAgo(ts) { if (!ts) return ''; const diff = Date.now() - new Date(ts).getTime(); const m = Math.floor(diff/60000); if (m < 1) return 'just now'; if (m < 60) return m+'m ago'; const h = Math.floor(m/60); if (h < 24) return h+'h ago'; return Math.floor(h/24)+'d ago'; }
+function statusBadge(s) { const map = { Active:'badge-green', Discarded:'badge-gray', Contaminated:'badge-red', Open:'badge-red', Investigating:'badge-amber', Resolved:'badge-green', Closed:'badge-gray' }; return `<span class="badge ${map[s]||'badge-gray'}"><span class="dot"></span>${s||'—'}</span>`; }
+function capBadge(cap) { if (!cap) return '—'; const c = capColorMap[cap]||'#ccc'; return `<span style="display:inline-flex;align-items:center;gap:5px;"><span class="cap-dot" style="background:${c};"></span>${cap}</span>`; }
+function setSyncing(v) { const d = document.getElementById('sync-dot'); const t = document.getElementById('sync-text'); if (d) { d.className = 'sync-dot' + (v?' syncing':''); t.textContent = v ? 'Syncing...' : 'Connected'; } }
+function showToast(msg, type='') { const el = document.createElement('div'); el.className = 'toast' + (type?' '+type:''); el.textContent = msg; document.getElementById('toast-container').appendChild(el); setTimeout(() => el.remove(), 3500); }
+function setBSCTimestamp() { const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,16); const el = document.getElementById('bsc-timestamp'); if (el) el.value = local; }
+function setSubmitting(btnId, v) { const b = document.getElementById(btnId); if (!b) return; b.disabled = v; if (v) b.innerHTML = '<span class="spin"></span> Saving...'; else b.textContent = b.dataset.label || 'Save'; }
+
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  const order = ['dashboard','reagents','thaw','bsc','contamination','search'];
+  const idx = order.indexOf(page);
+  if (idx >= 0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
+  if (page === 'dashboard') { updateStats(); updateDashboard(); }
+  if (page === 'reagents') renderReagents();
+  if (page === 'thaw') renderThaw();
+  if (page === 'bsc') { renderBSCFeed(); renderBSCTable(); setBSCTimestamp(); }
+  if (page === 'contamination') renderContamination();
+}
+
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  const today = new Date().toISOString().split('T')[0];
+  if (id==='modal-thaw') document.getElementById('m-thaw-date').value = today;
+  if (id==='modal-reagent') document.getElementById('m-r-date').value = today;
+  if (id==='modal-contamination') document.getElementById('m-c-date').value = today;
+  // pre-fill user name
+  const userName = currentAccount ? (currentAccount.name||'').split(' ')[0] : '';
+  if (id==='modal-bsc' && document.getElementById('m-bsc-user')) document.getElementById('m-bsc-user').value = userName;
+  if (id==='modal-thaw' && document.getElementById('m-thaw-by')) document.getElementById('m-thaw-by').value = userName;
+  if (id==='modal-reagent' && document.getElementById('m-r-by')) document.getElementById('m-r-by').value = userName;
+  if (id==='modal-contamination' && document.getElementById('m-c-by')) document.getElementById('m-c-by').value = userName;
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+
+// ===================== STATS & DASHBOARD =====================
+function updateStats() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('stat-active-thaws').textContent = DB.thaws.filter(t=>t.Status==='Active').length;
+  document.getElementById('stat-bsc-today').textContent = DB.bsc.filter(b=>b.EventTimestamp&&b.EventTimestamp.startsWith(today)).length;
+  document.getElementById('stat-reagents').textContent = DB.reagents.filter(r=>r.InUse==='Yes').length;
+  document.getElementById('stat-incidents').textContent = DB.contamination.filter(c=>c.Status==='Open'||c.Status==='Investigating').length;
+}
+
+function updateDashboard() {
+  const activeThaws = DB.thaws.filter(t=>t.Status==='Active');
+  const tb = document.getElementById('dash-thaw-body');
+  tb.innerHTML = !activeThaws.length ? '<tr><td colspan="5" class="empty-state">No active thaws</td></tr>'
+    : activeThaws.slice(0,5).map(e=>`<tr><td><strong>${e.CellLine||'—'}</strong></td><td>${fmtDate(e.DateThawed)}</td><td>${e.Passage?'P'+e.Passage:'—'}</td><td>${e.Incubator||'—'}</td><td>${statusBadge(e.Status)}</td></tr>`).join('');
+  const bfeed = document.getElementById('dash-bsc-feed');
+  bfeed.innerHTML = !DB.bsc.length ? '<div class="empty-state">No BSC activity yet</div>'
+    : DB.bsc.slice(0,5).map(e=>`<div class="feed-item"><div class="feed-content"><div class="feed-title">${e.UserName||'—'} — ${e.Procedure||'—'}</div><div class="feed-sub">${e.BSCName||''}${e.CellLine?' · '+e.CellLine:''}</div></div><div class="feed-time">${timeAgo(e.EventTimestamp)}</div></div>`).join('');
+  const rb = document.getElementById('dash-reagent-body');
+  const ar = DB.reagents.filter(r=>r.InUse==='Yes').slice(0,5);
+  rb.innerHTML = !ar.length ? '<tr><td colspan="3" class="empty-state">No reagents</td></tr>'
+    : ar.map(e=>`<tr><td><strong>${e.ReagentName||'—'}</strong></td><td class="mono">${e.LotNumber||'—'}</td><td>${fmtDate(e.DateRecorded)}</td></tr>`).join('');
+  const cb = document.getElementById('dash-cont-body');
+  cb.innerHTML = !DB.contamination.length ? '<tr><td colspan="4" class="empty-state">No incidents</td></tr>'
+    : DB.contamination.slice(0,4).map(e=>`<tr><td><strong>${e.CellLine||'—'}</strong></td><td>${fmtDate(e.DateDetected)}</td><td>${e.ContaminationType||'—'}</td><td>${statusBadge(e.Status)}</td></tr>`).join('');
+}
+
+// ===================== BSC =====================
+async function submitBSC() {
+  const user = document.getElementById('bsc-user').value.trim();
+  const hood = document.getElementById('bsc-hood').value;
+  const proc = document.getElementById('bsc-procedure').value;
+  if (!user || !hood || !proc) { showToast('User, BSC, and Procedure are required.', 'error'); return; }
+  const fields = {
+    Title: `${user} - ${proc} - ${hood}`,
+    UserName: user, BSCName: hood, Procedure: proc,
+    CellLine: document.getElementById('bsc-cellline').value.trim(),
+    CellType: document.getElementById('bsc-celltype').value.trim(),
+    EventTimestamp: new Date(document.getElementById('bsc-timestamp').value).toISOString(),
+    Notes: document.getElementById('bsc-notes').value.trim()
+  };
+  setSubmitting('bsc-submit-btn', true);
+  document.getElementById('bsc-submit-btn').dataset.label = 'Log Event';
+  try {
+    await spPost(LISTS.bsc, fields);
+    showToast('BSC event logged!', 'success');
+    ['bsc-user','bsc-cellline','bsc-celltype','bsc-notes'].forEach(f=>document.getElementById(f).value='');
+    document.getElementById('bsc-hood').value=''; document.getElementById('bsc-procedure').value='';
+    setBSCTimestamp();
+    await refreshAll();
+    renderBSCFeed(); renderBSCTable();
+  } finally { setSubmitting('bsc-submit-btn', false); document.getElementById('bsc-submit-btn').textContent = 'Log Event'; }
+}
+
+async function submitBSCModal() {
+  const user = document.getElementById('m-bsc-user').value.trim();
+  const hood = document.getElementById('m-bsc-hood').value;
+  const proc = document.getElementById('m-bsc-procedure').value;
+  if (!user || !hood || !proc) { showToast('User, BSC, and Procedure are required.', 'error'); return; }
+  const fields = {
+    Title: `${user} - ${proc} - ${hood}`,
+    UserName: user, BSCName: hood, Procedure: proc,
+    CellLine: document.getElementById('m-bsc-cellline').value.trim(),
+    CellType: document.getElementById('m-bsc-celltype').value.trim(),
+    EventTimestamp: new Date().toISOString(),
+    Notes: document.getElementById('m-bsc-notes').value.trim()
+  };
+  setSubmitting('m-bsc-submit', true); document.getElementById('m-bsc-submit').dataset.label = 'Log Event';
+  try { await spPost(LISTS.bsc, fields); showToast('BSC event logged!', 'success'); closeModal('modal-bsc'); await refreshAll(); }
+  finally { setSubmitting('m-bsc-submit', false); document.getElementById('m-bsc-submit').textContent = 'Log Event'; }
+}
+
+function renderBSCFeed() {
+  const el = document.getElementById('bsc-feed');
+  if (!el) return;
+  el.innerHTML = !DB.bsc.length ? '<div class="empty-state">No events yet</div>'
+    : DB.bsc.slice(0,8).map(e=>`<div class="feed-item"><div class="feed-icon"><svg viewBox="0 0 20 20" fill="currentColor" style="width:13px;height:13px;"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg></div><div class="feed-content"><div class="feed-title">${e.UserName||'—'} — ${e.Procedure||'—'}</div><div class="feed-sub">${e.BSCName||''}${e.CellLine?' · '+e.CellLine:''}</div></div><div class="feed-time">${timeAgo(e.EventTimestamp||e.Created)}</div></div>`).join('');
+}
+
+function renderBSCTable() {
+  const q = (document.getElementById('bsc-search')?.value||'').toLowerCase();
+  const rows = DB.bsc.filter(e=>!q||[e.UserName,e.BSCName,e.CellLine,e.Procedure].join(' ').toLowerCase().includes(q));
+  const tbody = document.getElementById('bsc-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = !rows.length ? '<tr><td colspan="6" class="empty-state">No events</td></tr>'
+    : rows.map(e=>`<tr><td>${e.BSCName||'—'}</td><td>${e.UserName||'—'}</td><td>${fmtTS(e.EventTimestamp||e.Created)}</td><td>${e.CellLine||'—'}</td><td><span class="badge badge-blue">${e.Procedure||'—'}</span></td><td style="color:var(--text2)">${e.Notes||'—'}</td></tr>`).join('');
+}
+
+// ===================== THAW =====================
+async function submitThaw() {
+  const line = document.getElementById('m-thaw-line').value.trim();
+  const date = document.getElementById('m-thaw-date').value;
+  if (!line || !date) { showToast('Cell Line and Date Thawed are required.', 'error'); return; }
+  const fields = {
+    Title: line + ' - ' + date,
+    CellLine: line,
+    CellType: document.getElementById('m-thaw-type').value.trim(),
+    DateThawed: date,
+    Passage: document.getElementById('m-thaw-passage').value || null,
+    DateFrozen: document.getElementById('m-thaw-frozen-date').value || null,
+    CapColor: document.getElementById('m-thaw-cap').value,
+    VialID: document.getElementById('m-thaw-vial').value.trim(),
+    ThawedBy: document.getElementById('m-thaw-by').value.trim(),
+    Incubator: document.getElementById('m-thaw-incubator').value,
+    Status: document.getElementById('m-thaw-status').value,
+    Notes: document.getElementById('m-thaw-notes').value.trim()
+  };
+  setSubmitting('m-thaw-submit', true); document.getElementById('m-thaw-submit').dataset.label = 'Save Thaw';
+  try { await spPost(LISTS.thaws, fields); showToast('Thaw logged!', 'success'); closeModal('modal-thaw'); await refreshAll(); renderThaw(); }
+  finally { setSubmitting('m-thaw-submit', false); document.getElementById('m-thaw-submit').textContent = 'Save Thaw'; }
+}
+
+function renderThaw() {
+  const q = (document.getElementById('thaw-search')?.value||'').toLowerCase();
+  const sf = document.getElementById('thaw-filter-status')?.value||'';
+  const inf = document.getElementById('thaw-filter-incubator')?.value||'';
+  const rows = DB.thaws.filter(e=>{
+    if (sf && e.Status!==sf) return false;
+    if (inf && e.Incubator!==inf) return false;
+    if (q && ![e.CellLine,e.CellType,e.Incubator,e.ThawedBy].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const tbody = document.getElementById('thaw-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = !rows.length ? '<tr><td colspan="9" class="empty-state">No thaw events match filters</td></tr>'
+    : rows.map(e=>`<tr><td><strong>${e.CellLine||'—'}</strong></td><td style="color:var(--text2)">${e.CellType||'—'}</td><td>${fmtDate(e.DateThawed)}</td><td>${e.Passage?'P'+e.Passage:'—'}</td><td>${capBadge(e.CapColor)}</td><td>${e.ThawedBy||'—'}</td><td>${e.Incubator||'—'}</td><td>${statusBadge(e.Status)}</td><td style="color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.Notes||'—'}</td></tr>`).join('');
+}
+
+// ===================== REAGENTS =====================
+async function submitReagent() {
+  const name = document.getElementById('m-r-name').value.trim();
+  const lot = document.getElementById('m-r-lot').value.trim();
+  if (!name || !lot) { showToast('Reagent Name and Lot Number are required.', 'error'); return; }
+  const fields = {
+    Title: name + ' - ' + lot,
+    ReagentName: name, LotNumber: lot,
+    Vendor: document.getElementById('m-r-vendor').value.trim(),
+    RecordedBy: document.getElementById('m-r-by').value.trim(),
+    DateRecorded: document.getElementById('m-r-date').value,
+    InUse: document.getElementById('m-r-inuse').value,
+    OpenedDate: document.getElementById('m-r-opened').value || null,
+    ExpirationDate: document.getElementById('m-r-expiry').value || null,
+    Notes: document.getElementById('m-r-notes').value.trim()
+  };
+  setSubmitting('m-r-submit', true); document.getElementById('m-r-submit').dataset.label = 'Save Reagent';
+  try { await spPost(LISTS.reagents, fields); showToast('Reagent saved!', 'success'); closeModal('modal-reagent'); await refreshAll(); renderReagents(); }
+  finally { setSubmitting('m-r-submit', false); document.getElementById('m-r-submit').textContent = 'Save Reagent'; }
+}
+
+function renderReagents() {
+  const q = (document.getElementById('reagent-search')?.value||'').toLowerCase();
+  const inuse = document.getElementById('reagent-filter-inuse')?.value||'';
+  const rows = DB.reagents.filter(e=>{
+    if (inuse && e.InUse!==inuse) return false;
+    if (q && ![e.ReagentName,e.Vendor,e.LotNumber,e.RecordedBy].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const tbody = document.getElementById('reagent-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = !rows.length ? '<tr><td colspan="9" class="empty-state">No reagents found</td></tr>'
+    : rows.map(e=>`<tr><td><strong>${e.ReagentName||'—'}</strong></td><td style="color:var(--text2)">${e.Vendor||'—'}</td><td class="mono">${e.LotNumber||'—'}</td><td>${fmtDate(e.DateRecorded)}</td><td>${fmtDate(e.OpenedDate)}</td><td>${fmtDate(e.ExpirationDate)}</td><td>${e.RecordedBy||'—'}</td><td>${e.InUse==='Yes'?'<span class="badge badge-green"><span class="dot"></span>Yes</span>':'<span class="badge badge-gray">No</span>'}</td><td style="color:var(--text2);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.Notes||'—'}</td></tr>`).join('');
+}
+
+// ===================== CONTAMINATION =====================
+async function submitContamination() {
+  const line = document.getElementById('m-c-line').value.trim();
+  const date = document.getElementById('m-c-date').value;
+  if (!line || !date) { showToast('Cell Line and Date Detected are required.', 'error'); return; }
+  const fields = {
+    Title: line + ' - ' + document.getElementById('m-c-conttype').value,
+    CellLine: line,
+    CellType: document.getElementById('m-c-type').value.trim(),
+    DateDetected: date,
+    SuspectedOnsetDate: document.getElementById('m-c-onset').value || null,
+    ContaminationType: document.getElementById('m-c-conttype').value,
+    Incubator: document.getElementById('m-c-incubator').value,
+    ObservedBy: document.getElementById('m-c-by').value.trim(),
+    LastBSCUsed: document.getElementById('m-c-bsc').value.trim(),
+    LinkedThawID: document.getElementById('m-c-thaw').value.trim(),
+    Status: document.getElementById('m-c-status').value,
+    Notes: document.getElementById('m-c-notes').value.trim(),
+    RootCause: document.getElementById('m-c-root').value.trim(),
+    CorrectiveAction: document.getElementById('m-c-action').value.trim()
+  };
+  setSubmitting('m-c-submit', true); document.getElementById('m-c-submit').dataset.label = 'Report Incident';
+  try { await spPost(LISTS.contamination, fields); showToast('Incident reported.', 'success'); closeModal('modal-contamination'); await refreshAll(); renderContamination(); }
+  finally { setSubmitting('m-c-submit', false); document.getElementById('m-c-submit').textContent = 'Report Incident'; }
+}
+
+function renderContamination() {
+  const q = (document.getElementById('cont-search')?.value||'').toLowerCase();
+  const sf = document.getElementById('cont-filter-status')?.value||'';
+  const tf = document.getElementById('cont-filter-type')?.value||'';
+  const rows = DB.contamination.filter(e=>{
+    if (sf && e.Status!==sf) return false;
+    if (tf && e.ContaminationType!==tf) return false;
+    if (q && ![e.CellLine,e.Incubator,e.ObservedBy].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const el = document.getElementById('contamination-list');
+  if (!el) return;
+  if (!rows.length) { el.innerHTML = '<div class="empty-state" style="padding:40px 0;">No contamination incidents logged</div>'; return; }
+  const relThaws = (line) => DB.thaws.filter(t=>t.CellLine&&t.CellLine.toLowerCase()===line.toLowerCase()).slice(0,2);
+  const relBSC = (line) => DB.bsc.filter(b=>b.CellLine&&b.CellLine.toLowerCase()===line.toLowerCase()).slice(0,3);
+  el.innerHTML = rows.map(e=>{
+    const cls = e.Status==='Open'?'open':e.Status==='Investigating'?'investigating':e.Status==='Resolved'?'resolved':'';
+    const rt = relThaws(e.CellLine||''); const rb = relBSC(e.CellLine||'');
+    return `<div class="incident-card ${cls}">
+      <div class="incident-header">
+        <div><div class="incident-id">${fmtDate(e.DateDetected)}</div><div class="incident-title">${e.CellLine||'—'} — ${e.ContaminationType||'Unknown'} contamination</div></div>
+        ${statusBadge(e.Status)}
+      </div>
+      <div class="incident-meta">
+        ${e.Incubator?`<span>🧫 ${e.Incubator}</span>`:''}
+        ${e.ObservedBy?`<span>👤 ${e.ObservedBy}</span>`:''}
+        ${e.LastBSCUsed?`<span>🗄️ Last BSC: ${e.LastBSCUsed}</span>`:''}
+        ${e.LinkedThawID?`<span>🔗 Thaw: ${e.LinkedThawID}</span>`:''}
+      </div>
+      ${e.Notes?`<div style="margin-top:10px;font-size:13px;color:var(--text2);">${e.Notes}</div>`:''}
+      ${e.RootCause?`<div style="margin-top:6px;font-size:12px;"><strong>Root cause:</strong> ${e.RootCause}</div>`:''}
+      ${e.CorrectiveAction?`<div style="font-size:12px;"><strong>Corrective action:</strong> ${e.CorrectiveAction}</div>`:''}
+      ${rt.length||rb.length?`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);"><div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:8px;">Related records</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${rt.map(t=>`<span class="badge badge-blue">Thaw: ${t.CellLine} (${t.Status})</span>`).join('')}${rb.map(b=>`<span class="badge badge-gray">BSC: ${b.Procedure} by ${b.UserName}</span>`).join('')}</div></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ===================== GLOBAL SEARCH =====================
+function globalSearch(q) {
+  const el = document.getElementById('search-results');
+  if (!q||q.length<2) { el.innerHTML = '<div class="empty-state" style="padding:60px 0;">Start typing to search across all logs</div>'; return; }
+  const ql = q.toLowerCase();
+  const mT = DB.thaws.filter(e=>[e.CellLine,e.CellType,e.Incubator,e.ThawedBy,e.VialID].join(' ').toLowerCase().includes(ql));
+  const mB = DB.bsc.filter(e=>[e.UserName,e.BSCName,e.CellLine,e.Procedure].join(' ').toLowerCase().includes(ql));
+  const mR = DB.reagents.filter(e=>[e.ReagentName,e.Vendor,e.LotNumber,e.RecordedBy].join(' ').toLowerCase().includes(ql));
+  const mC = DB.contamination.filter(e=>[e.CellLine,e.Incubator,e.ObservedBy,e.ContaminationType].join(' ').toLowerCase().includes(ql));
+  if (!mT.length&&!mB.length&&!mR.length&&!mC.length) { el.innerHTML = '<div class="empty-state" style="padding:40px 0;">No results for "'+q+'"</div>'; return; }
+  let html = '';
+  if (mT.length) { html += `<div class="search-result-group"><div class="search-result-label">Cell Thaws (${mT.length})</div>${mT.map(e=>`<div class="search-result-item" onclick="navigate('thaw')"><div class="search-result-icon" style="background:var(--accent-bg)"><svg width="14" height="14" viewBox="0 0 20 20" fill="var(--accent)"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/></svg></div><div class="search-result-main"><div class="search-result-title">${e.CellLine||'—'}</div><div class="search-result-sub">${e.Passage?'P'+e.Passage:''} · ${e.Incubator||'No incubator'} · ${e.ThawedBy||''}</div></div><div>${statusBadge(e.Status)}</div></div>`).join('')}</div>`; }
+  if (mB.length) { html += `<div class="search-result-group"><div class="search-result-label">BSC Events (${mB.length})</div>${mB.map(e=>`<div class="search-result-item" onclick="navigate('bsc')"><div class="search-result-icon"><svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg></div><div class="search-result-main"><div class="search-result-title">${e.Procedure||'—'} — ${e.BSCName||'—'}</div><div class="search-result-sub">${e.UserName||''} · ${e.CellLine||''} · ${fmtTS(e.EventTimestamp||e.Created)}</div></div></div>`).join('')}</div>`; }
+  if (mR.length) { html += `<div class="search-result-group"><div class="search-result-label">Reagents (${mR.length})</div>${mR.map(e=>`<div class="search-result-item" onclick="navigate('reagents')"><div class="search-result-icon" style="background:var(--green-bg)"><svg width="14" height="14" viewBox="0 0 20 20" fill="var(--green)"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7z"/></svg></div><div class="search-result-main"><div class="search-result-title">${e.ReagentName||'—'}</div><div class="search-result-sub">Lot ${e.LotNumber||'—'} · ${e.Vendor||''}</div></div></div>`).join('')}</div>`; }
+  if (mC.length) { html += `<div class="search-result-group"><div class="search-result-label">Contamination Incidents (${mC.length})</div>${mC.map(e=>`<div class="search-result-item" onclick="navigate('contamination')"><div class="search-result-icon" style="background:var(--red-bg)"><svg width="14" height="14" viewBox="0 0 20 20" fill="var(--red)"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92z"/></svg></div><div class="search-result-main"><div class="search-result-title">${e.CellLine||'—'} — ${e.ContaminationType||'—'}</div><div class="search-result-sub">${e.Incubator||''} · ${fmtDate(e.DateDetected)}</div></div><div>${statusBadge(e.Status)}</div></div>`).join('')}</div>`; }
+  el.innerHTML = html;
+}
+
+// ===================== INIT =====================
+initAuth();
+</script>
+</body>
+</html>
